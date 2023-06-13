@@ -11,3 +11,6 @@ categories = ["parser-implementations", "development-tools::procedural-macro-hel
 
 [dependencies]
 chumsky = "0.9"
+
+[dev-dependencies]
+ariadne = "0.1"

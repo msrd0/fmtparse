@@ -59,6 +59,7 @@ impl Align {
 			just(">").map(|_| Self::Right),
 			empty().map(|_| Self::Left)
 		))
+		.debug("Align Parser")
 	}
 }
 
@@ -77,26 +78,38 @@ pub enum Padding {
 
 impl Padding {
 	fn parser() -> impl Parser<char, Self, Error = PError> + Clone {
+		let width_parser = choice((
+			uint(10)
+				.then_ignore(just("$"))
+				.map(|idx| Param::Dynamic(VarName::Index(idx))),
+			ident()
+				.then_ignore(just("$"))
+				.map(|name| Param::Dynamic(VarName::Ident(name))),
+			uint(10).map(Param::Const)
+		));
+
 		choice((
 			just("0")
 				.ignore_then(uint(10))
 				.map(|width| Self::ZeroPadding {
 					width: Param::Const(width)
+				})
+				.debug("Padding::ZeroPadding Parser"),
+			Align::parser()
+				.then(width_parser.clone())
+				.map(|(align, width)| Self::TextPadding {
+					ch: ' ',
+					align,
+					width
 				}),
 			any()
 				.or(empty().map(|_| ' '))
 				.then(Align::parser())
-				.then(choice((
-					uint(10)
-						.then_ignore(just("$"))
-						.map(|idx| Param::Dynamic(VarName::Index(idx))),
-					ident()
-						.then_ignore(just("$"))
-						.map(|name| Param::Dynamic(VarName::Ident(name))),
-					uint(10).map(Param::Const)
-				)))
+				.then(width_parser)
 				.map(|((ch, align), width)| Self::TextPadding { ch, align, width })
+				.debug("Padding::TextPadding Parser")
 		))
+		.debug("Padding Parser")
 	}
 }
 
