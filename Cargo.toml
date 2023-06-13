@@ -1,0 +1,13 @@
+# -*- eval: (cargo-minor-mode 1) -*-
+
+[package]
+name = "fmtparse"
+version = "0.0.0"
+publish = false
+edition = "2021"
+description = "Parse format!-like strings"
+keywords = ["fmt", "format", "format-string"]
+categories = ["parser-implementations", "development-tools::procedural-macro-helpers"]
+
+[dependencies]
+chumsky = "0.9"
