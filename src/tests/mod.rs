@@ -77,32 +77,34 @@ macro_rules! text {
 	};
 }
 
-macro_rules! var {
+macro_rules! var_name {
 	() => {
-		Token::Variable {
-			name: VarName::None,
-			padding: None,
-			precision: None,
-			style: Style::Display,
-			pretty: false,
-			sign: false
-		}
+		VarName::None
 	};
-
 	($idx:literal) => {
-		Token::Variable {
-			name: VarName::Index($idx),
-			padding: None,
-			precision: None,
-			style: Style::Display,
-			pretty: false,
-			sign: false
-		}
+		VarName::Index($idx)
 	};
-
 	($ident:ident) => {
+		VarName::Ident(String::from(stringify!($ident)))
+	};
+}
+
+macro_rules! align {
+	(<) => {
+		Align::Left
+	};
+	(^) => {
+		Align::Center
+	};
+	(>) => {
+		Align::Right
+	};
+}
+
+macro_rules! var {
+	($($var_name:tt)?) => {
 		Token::Variable {
-			name: VarName::Ident(String::from(stringify!($ident))),
+			name: var_name!($($var_name)?),
 			padding: None,
 			precision: None,
 			style: Style::Display,
@@ -123,6 +125,62 @@ macro_rules! var {
 			style: Style::Display,
 			pretty: false,
 			sign: false
+		}
+	};
+
+	(: $width:tt $) => {
+		Token::Variable {
+			name: VarName::None,
+			padding: Some(Padding::TextPadding {
+				ch: ' ',
+				align: Align::Left,
+				width: Param::Dynamic(var_name!($width))
+			}),
+			precision: None,
+			style: Style::Display,
+			pretty: false,
+			sign: false
+		}
+	};
+
+	(: $ch:literal $align:tt $width:literal) => {
+		Token::Variable {
+			name: VarName::None,
+			padding: Some(Padding::TextPadding {
+				ch: $ch,
+				align: align!($align),
+				width: Param::Const($width)
+			}),
+			precision: None,
+			style: Style::Display,
+			pretty: false,
+			sign: false
+		}
+	};
+
+	($var_name:tt : $width:tt $) => {
+		Token::Variable {
+			name: var_name!($var_name),
+			padding: Some(Padding::TextPadding {
+				ch: ' ',
+				align: Align::Left,
+				width: Param::Dynamic(var_name!($width))
+			}),
+			precision: None,
+			style: Style::Display,
+			pretty: false,
+			sign: false
+		}
+	};
+
+	(:+) => {
+		Token::Variable {
+			name: VarName::None,
+			padding: None,
+			precision: None,
+			style: Style::Display,
+			pretty: false,
+			sign: true
 		}
 	};
 
@@ -148,6 +206,17 @@ macro_rules! var {
 		}
 	};
 
+	(: #x) => {
+		Token::Variable {
+			name: VarName::None,
+			padding: None,
+			precision: None,
+			style: Style::LowerHex,
+			pretty: true,
+			sign: false
+		}
+	};
+
 	(: 0 $width:literal) => {
 		Token::Variable {
 			name: VarName::None,
@@ -160,6 +229,24 @@ macro_rules! var {
 			sign: false
 		}
 	};
+
+	(: # 0 $width:literal x) => {
+		Token::Variable {
+			name: VarName::None,
+			padding: Some(Padding::ZeroPadding {
+				width: Param::Const($width)
+			}),
+			precision: None,
+			style: Style::LowerHex,
+			pretty: true,
+			sign: false
+		}
+	}
+}
+
+#[test]
+fn mix_vars_and_escaping() {
+	assert("{{{x}}}", &[text!("{"), var!(x), text!("}")]);
 }
 
 mod std_fmt;

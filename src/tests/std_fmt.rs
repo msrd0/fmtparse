@@ -88,3 +88,90 @@ fn named_parameters_3() {
 fn width_1() {
 	assert("Hello {:5}!", &[text!("Hello "), var!(:5), text!("!")]);
 }
+
+#[test]
+fn width_2() {
+	assert("Hello {:1$}!", &[text!("Hello "), var!(:1$), text!("!")]);
+}
+
+#[test]
+fn width_3() {
+	assert("Hello {1:0$}!", &[text!("Hello "), var!(1:0$), text!("!")]);
+}
+
+#[test]
+fn width_4() {
+	assert("Hello {:width$}!", &[
+		text!("Hello "),
+		var!(:width$),
+		text!("!")
+	]);
+}
+
+#[test]
+fn fill_1() {
+	assert("Hello {:<5}!", &[
+		text!("Hello "),
+		var!(: ' ' < 5),
+		text!("!")
+	]);
+}
+
+#[test]
+fn fill_2() {
+	assert("Hello {:-<5}!", &[
+		text!("Hello "),
+		var!(: '-' < 5),
+		text!("!")
+	]);
+}
+
+#[test]
+fn fill_3() {
+	assert("Hello {:^5}!", &[
+		text!("Hello "),
+		var!(: ' ' ^ 5),
+		text!("!")
+	]);
+}
+
+#[test]
+fn fill_4() {
+	assert("Hello {:>5}!", &[
+		text!("Hello "),
+		var!(: ' ' > 5),
+		text!("!")
+	]);
+}
+
+#[test]
+fn sign_1() {
+	assert("Hello {:+}!", &[text!("Hello "), var!(:+), text!("!")]);
+}
+
+#[test]
+fn sign_2() {
+	assert("{:#x}!", &[var!(:#x), text!("!")]);
+}
+
+#[test]
+fn sign_3() {
+	assert("Hello {:05}!", &[text!("Hello "), var!(:0 5), text!("!")]);
+}
+
+#[test]
+fn sign_4() {
+	assert("{:#010x}!", &[var!(:# 0 10 x), text!("!")]);
+}
+
+// more tests here ...
+
+#[test]
+fn escaping_1() {
+	assert("Hello {{}}", &[text!("Hello {}")]);
+}
+
+#[test]
+fn escaping_2() {
+	assert("{{ Hello", &[text!("{ Hello")]);
+}
