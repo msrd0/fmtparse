@@ -1,6 +1,9 @@
 #![warn(rust_2018_idioms, unreachable_pub)]
 #![forbid(elided_lifetimes_in_paths, unsafe_code)]
 
+#[cfg(test)]
+mod tests;
+
 use chumsky::{
 	prelude::*,
 	text::{ident, whitespace}
@@ -18,6 +21,7 @@ where
 	text::int(radix).map(|s: String| s.parse().unwrap())
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum VarName {
 	None,
 	Index(usize),
@@ -34,11 +38,13 @@ impl VarName {
 	}
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum Param {
 	Const(usize),
 	Dynamic(VarName)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Align {
 	Left,
 	Center,
@@ -56,6 +62,7 @@ impl Align {
 	}
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum Padding {
 	/// Padding with zeroes. Usually for numbers.
 	ZeroPadding { width: Param },
@@ -93,6 +100,7 @@ impl Padding {
 	}
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Style {
 	Display,
 	Debug,
@@ -115,6 +123,7 @@ impl Style {
 	}
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum Token {
 	/// A text token. Double braces (`{{` and `}}`) have already been converted to single
 	/// braces.
