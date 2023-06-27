@@ -61,6 +61,7 @@ fn report_err(buf: &str, path_str: &str, err: Vec<Simple<char>>) {
 
 #[track_caller]
 fn assert(input: &str, expected: &[Token]) {
+	println!("Input: {input}");
 	let tokens = match parse(input) {
 		Ok(tokens) => tokens,
 		Err(err) => {
@@ -105,18 +106,19 @@ macro_rules! var {
 	($($var_name:tt)?) => {
 		Token::Variable {
 			name: var_name!($($var_name)?),
-			padding: None,
+			text_padding: None,
 			precision: None,
 			style: Style::Display,
 			pretty: false,
-			sign: false
+			sign: false,
+			zero_padding: None
 		}
 	};
 
 	(: $width:literal) => {
 		Token::Variable {
 			name: VarName::None,
-			padding: Some(Padding::TextPadding {
+			text_padding: Some(TextPadding {
 				ch: ' ',
 				align: Align::Left,
 				width: Param::Const($width)
@@ -124,14 +126,15 @@ macro_rules! var {
 			precision: None,
 			style: Style::Display,
 			pretty: false,
-			sign: false
+			sign: false,
+			zero_padding: None
 		}
 	};
 
 	(: $width:tt $) => {
 		Token::Variable {
 			name: VarName::None,
-			padding: Some(Padding::TextPadding {
+			text_padding: Some(TextPadding {
 				ch: ' ',
 				align: Align::Left,
 				width: Param::Dynamic(var_name!($width))
@@ -139,14 +142,15 @@ macro_rules! var {
 			precision: None,
 			style: Style::Display,
 			pretty: false,
-			sign: false
+			sign: false,
+			zero_padding: None
 		}
 	};
 
 	(: $ch:literal $align:tt $width:literal) => {
 		Token::Variable {
 			name: VarName::None,
-			padding: Some(Padding::TextPadding {
+			text_padding: Some(TextPadding {
 				ch: $ch,
 				align: align!($align),
 				width: Param::Const($width)
@@ -154,14 +158,15 @@ macro_rules! var {
 			precision: None,
 			style: Style::Display,
 			pretty: false,
-			sign: false
+			sign: false,
+			zero_padding: None
 		}
 	};
 
 	($var_name:tt : $width:tt $) => {
 		Token::Variable {
 			name: var_name!($var_name),
-			padding: Some(Padding::TextPadding {
+			text_padding: Some(TextPadding {
 				ch: ' ',
 				align: Align::Left,
 				width: Param::Dynamic(var_name!($width))
@@ -169,77 +174,84 @@ macro_rules! var {
 			precision: None,
 			style: Style::Display,
 			pretty: false,
-			sign: false
+			sign: false,
+			zero_padding: None
 		}
 	};
 
 	(:+) => {
 		Token::Variable {
 			name: VarName::None,
-			padding: None,
+			text_padding: None,
 			precision: None,
 			style: Style::Display,
 			pretty: false,
-			sign: true
+			sign: true,
+			zero_padding: None
 		}
 	};
 
 	(: ?) => {
 		Token::Variable {
 			name: VarName::None,
-			padding: None,
+			text_padding: None,
 			precision: None,
 			style: Style::Debug,
 			pretty: false,
-			sign: false
+			sign: false,
+			zero_padding: None
 		}
 	};
 
 	(: #?) => {
 		Token::Variable {
 			name: VarName::None,
-			padding: None,
+			text_padding: None,
 			precision: None,
 			style: Style::Debug,
 			pretty: true,
-			sign: false
+			sign: false,
+			zero_padding: None
 		}
 	};
 
 	(: #x) => {
 		Token::Variable {
 			name: VarName::None,
-			padding: None,
+			text_padding: None,
 			precision: None,
 			style: Style::LowerHex,
 			pretty: true,
-			sign: false
+			sign: false,
+			zero_padding: None
 		}
 	};
 
 	(: 0 $width:literal) => {
 		Token::Variable {
 			name: VarName::None,
-			padding: Some(Padding::ZeroPadding {
-				width: Param::Const($width)
-			}),
+			text_padding: None,
 			precision: None,
 			style: Style::Display,
 			pretty: false,
-			sign: false
+			sign: false,
+			zero_padding: Some(ZeroPadding {
+				width: $width
+			})
 		}
 	};
 
 	(: # 0 $width:literal x) => {
 		Token::Variable {
 			name: VarName::None,
-			padding: Some(Padding::ZeroPadding {
-				width: Param::Const($width)
-			}),
+			text_padding: None,
 			precision: None,
 			style: Style::LowerHex,
 			pretty: true,
-			sign: false
+			sign: false,
+			zero_padding: Some(ZeroPadding {
+				width: $width
+			})
 		}
 	}
 }

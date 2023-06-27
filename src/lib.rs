@@ -21,6 +21,11 @@ where
 	text::int(radix).map(|s: String| s.parse().unwrap())
 }
 
+/// A variable name. This can be one of these 3 cases:
+///
+///  - `{}` is [`VarName::None`]
+///  - `{1}` is [`VarName::Index(1)`]
+///  - `{foo}` is [`VarName::Ident("foo")`]
 #[derive(Debug, Eq, PartialEq)]
 pub enum VarName {
 	None,
@@ -38,6 +43,7 @@ impl VarName {
 	}
 }
 
+/// A parameter to an option. Can be either a constant or dependent on a variable.
 #[derive(Debug, Eq, PartialEq)]
 pub enum Param {
 	Const(usize),
@@ -63,20 +69,30 @@ impl Align {
 	}
 }
 
+// Padding with zeroes. Usually for numbers.
 #[derive(Debug, Eq, PartialEq)]
-pub enum Padding {
-	/// Padding with zeroes. Usually for numbers.
-	ZeroPadding { width: Param },
+pub struct ZeroPadding {
+	width: usize
+}
 
-	/// Padding a custom char. Using spaces by default.
-	TextPadding {
-		ch: char,
-		align: Align,
-		width: Param
+impl ZeroPadding {
+	fn parser() -> impl Parser<char, Self, Error = PError> + Clone {
+		just("0")
+			.ignore_then(uint(10))
+			.map(|width| Self { width })
+			.debug("ZeroPadding Parser")
 	}
 }
 
-impl Padding {
+/// Padding a custom char. Using spaces by default.
+#[derive(Debug, Eq, PartialEq)]
+pub struct TextPadding {
+	ch: char,
+	align: Align,
+	width: Param
+}
+
+impl TextPadding {
 	fn parser() -> impl Parser<char, Self, Error = PError> + Clone {
 		let width_parser = choice((
 			uint(10)
@@ -88,28 +104,15 @@ impl Padding {
 			uint(10).map(Param::Const)
 		));
 
+		// we need two parsers here, otherwise the any() would parse the token that
+		// specifies the alignment if only the alignment is specified
 		choice((
-			just("0")
-				.ignore_then(uint(10))
-				.map(|width| Self::ZeroPadding {
-					width: Param::Const(width)
-				})
-				.debug("Padding::ZeroPadding Parser"),
-			Align::parser()
-				.then(width_parser.clone())
-				.map(|(align, width)| Self::TextPadding {
-					ch: ' ',
-					align,
-					width
-				}),
-			any()
-				.or(empty().map(|_| ' '))
-				.then(Align::parser())
-				.then(width_parser)
-				.map(|((ch, align), width)| Self::TextPadding { ch, align, width })
-				.debug("Padding::TextPadding Parser")
+			empty().map(|_| ' ').then(Align::parser()),
+			any().then(Align::parser())
 		))
-		.debug("Padding Parser")
+		.then(width_parser)
+		.map(|((ch, align), width)| Self { ch, align, width })
+		.debug("TextPadding Parser")
 	}
 }
 
@@ -148,7 +151,7 @@ pub enum Token {
 		name: VarName,
 
 		/// The padding/fill/alignment of the variable.
-		padding: Option<Padding>,
+		text_padding: Option<TextPadding>,
 		/// The precision of the argument.
 		precision: Option<Param>,
 
@@ -157,35 +160,45 @@ pub enum Token {
 		/// Whether to use pretty printing (`{:#}`).
 		pretty: bool,
 		/// Whether to print signs (`{:+}`).
-		sign: bool
+		sign: bool,
+
+		/// The zero padding of the variable. Usually only used with numbers.
+		zero_padding: Option<ZeroPadding>
 	}
 }
 
 impl Token {
 	fn parser() -> impl Parser<char, Self, Error = PError> + Clone {
+		// a parser that parses text occurences and unescapes {{ and }} while parsing
+		let text_parser = none_of("{}")
+			.or(just("{{").map(|_| '{'))
+			.or(just("}}").map(|_| '}'))
+			.repeated()
+			.at_least(1)
+			.map(|text| Self::Text(text.into_iter().collect()));
+
+		// a parser that parses simple variables consisting only of braces and name
+		let simple_var_parser = just("{")
+			.ignore_then(VarName::parser())
+			.then_ignore(whitespace())
+			.then_ignore(just("}"))
+			.map(|name| Self::Variable {
+				name,
+				text_padding: None,
+				precision: None,
+				style: Style::Display,
+				pretty: false,
+				sign: false,
+				zero_padding: None
+			});
+
 		choice((
-			none_of("{}")
-				.or(just("{{").map(|_| '{'))
-				.or(just("}}").map(|_| '}'))
-				.repeated()
-				.at_least(1)
-				.map(|text| Self::Text(text.into_iter().collect())),
-			just("{")
-				.ignore_then(VarName::parser())
-				.then_ignore(whitespace())
-				.then_ignore(just("}"))
-				.map(|name| Self::Variable {
-					name,
-					padding: None,
-					precision: None,
-					style: Style::Display,
-					pretty: false,
-					sign: false
-				}),
+			text_parser,
+			simple_var_parser,
 			just("{")
 				.ignore_then(VarName::parser())
 				.then_ignore(just(":"))
-				.then(Padding::parser().map(Some).or(empty().map(|_| None)))
+				.then(TextPadding::parser().map(Some).or(empty().map(|_| None)))
 				.then(just("+").map(|_| true).or(empty().map(|_| false)))
 				.then(just("#").map(|_| true).or(empty().map(|_| false)))
 				.then(
@@ -203,19 +216,29 @@ impl Token {
 						.map(Some)
 						.or(empty().map(|_| None))
 				)
+				.then(ZeroPadding::parser().map(Some).or(empty().map(|_| None)))
 				.then(Style::parser())
 				.then_ignore(whitespace())
 				.then_ignore(just("}"))
-				.map(|(((((name, padding), sign), pretty), precision), style)| {
-					Self::Variable {
-						name,
-						padding,
-						precision,
-						style,
-						pretty,
-						sign
+				.map(
+					|(
+						(
+							((((name, text_padding), sign), pretty), precision),
+							zero_padding
+						),
+						style
+					)| {
+						Self::Variable {
+							name,
+							text_padding,
+							precision,
+							style,
+							pretty,
+							sign,
+							zero_padding
+						}
 					}
-				})
+				)
 		))
 	}
 }
