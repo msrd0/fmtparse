@@ -1,0 +1,47 @@
+name: Rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # check that the tests pass
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        rust:
+          - name: "Stable"
+            toolchain: "stable"
+            nightly: false
+          - name: "Nightly"
+            toolchain: "nightly"
+            nightly: true
+    name: "Check (Rust ${{matrix.rust.name}})"
+    continue-on-error: ${{matrix.rust.nightly}}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{matrix.rust.toolchain}}
+        id: rust-toolchain
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/git
+            ~/.cargo/registry
+            target
+          key: "${{runner.os}} Rust ${{steps.rust-toolchain.outputs.cachekey}}"
+      - run: cargo +${{matrix.rust.toolchain}} test
+
+  # check for correct code formatting
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo +nightly fmt --all -- --check
