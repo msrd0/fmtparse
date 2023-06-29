@@ -104,10 +104,12 @@ impl Padding {
 		// we need two parsers here, otherwise the any() would parse the token that
 		// specifies the alignment if only the alignment is specified
 		choice((
-			empty().map(|_| ' ').then(Align::parser()),
-			any().then(Align::parser())
+			empty()
+				.map(|_| ' ')
+				.then(Align::parser())
+				.then(width_parser.clone()),
+			any().then(Align::parser()).then(width_parser)
 		))
-		.then(width_parser)
 		.map(|((ch, align), width)| Self::TextPadding { ch, align, width })
 		.debug("Padding::TextPadding Parser")
 	}
@@ -232,7 +234,11 @@ impl Token {
 			.then_ignore(just(":"))
 			.then(just("+").map(|_| true).or(empty().map(|_| false)))
 			.then(just("#").map(|_| true).or(empty().map(|_| false)))
-			.then(Padding::zero_padding_parser().map(Some).or(empty().map(|_| None)))
+			.then(
+				Padding::zero_padding_parser()
+					.map(Some)
+					.or(empty().map(|_| None))
+			)
 			.then(precision_parser)
 			.then(Style::parser())
 			.then_ignore(whitespace())
