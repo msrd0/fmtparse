@@ -6,9 +6,9 @@ mod tests;
 
 use chumsky::{
 	prelude::*,
-	text::{ident, whitespace}
+	text::{self, whitespace}
 };
-use std::{fmt::Debug, str::FromStr};
+use std::{fmt::Debug, iter, str::FromStr};
 
 type PError = Simple<char>;
 
@@ -19,6 +19,30 @@ where
 	T::Err: Debug
 {
 	text::int(radix).map(|s: String| s.parse().unwrap())
+}
+
+fn is_relaxed(ch: &char) -> bool {
+	!ch.is_whitespace() && !ch.is_control() && *ch != ':' && *ch != '{' && *ch != '}'
+}
+
+/// A parser for an identifier. This can be either chumsky's `text::ident` parser which
+/// parses any C-style identifier, or a relaxed identifier.
+///
+/// A relaxed identifier doesn't start with a numeric character and contains any
+/// characters that are
+///  - not control chars
+///  - not a whitespace
+///  - not a colon (`:`)
+///  - no braces (`{` or `}`)
+fn ident(relaxed: bool) -> impl Parser<char, String, Error = PError> + Clone {
+	if relaxed {
+		filter(|ch: &char| is_relaxed(ch) && !ch.is_numeric())
+			.then(filter(is_relaxed).repeated())
+			.map(|(first, chars)| iter::once(first).chain(chars.into_iter()).collect())
+			.boxed()
+	} else {
+		text::ident().boxed()
+	}
 }
 
 /// A variable name. This can be one of these 3 cases:
@@ -34,10 +58,10 @@ pub enum VarName {
 }
 
 impl VarName {
-	fn parser() -> impl Parser<char, Self, Error = PError> + Clone {
+	fn parser(relaxed: bool) -> impl Parser<char, Self, Error = PError> + Clone {
 		choice((
 			uint(10).map(Self::Index),
-			ident().map(Self::Ident),
+			ident(relaxed).map(Self::Ident),
 			empty().map(|_| Self::None)
 		))
 	}
@@ -95,7 +119,7 @@ impl Padding {
 			uint(10)
 				.then_ignore(just("$"))
 				.map(|idx| Param::Dynamic(VarName::Index(idx))),
-			ident()
+			ident(false)
 				.then_ignore(just("$"))
 				.map(|name| Param::Dynamic(VarName::Ident(name))),
 			uint(10).map(Param::Const)
@@ -164,7 +188,7 @@ pub enum Token {
 }
 
 impl Token {
-	fn parser() -> impl Parser<char, Self, Error = PError> + Clone {
+	fn parser(relaxed: bool) -> impl Parser<char, Self, Error = PError> + Clone {
 		// a parser that parses text occurences and unescapes {{ and }} while parsing
 		let text_parser = none_of("{}")
 			.or(just("{{").map(|_| '{'))
@@ -175,7 +199,7 @@ impl Token {
 
 		// a parser that parses simple variables consisting only of braces and name
 		let simple_var_parser = just("{")
-			.ignore_then(VarName::parser())
+			.ignore_then(VarName::parser(relaxed))
 			.then_ignore(whitespace())
 			.then_ignore(just("}"))
 			.map(|name| Self::Variable {
@@ -193,7 +217,7 @@ impl Token {
 				uint(10)
 					.then_ignore(just("$"))
 					.map(|idx| Param::Dynamic(VarName::Index(idx))),
-				ident()
+				ident(false)
 					.then_ignore(just("$"))
 					.map(|ident| Param::Dynamic(VarName::Ident(ident))),
 				just("*").map(|_| Param::Dynamic(VarName::None)),
@@ -204,7 +228,7 @@ impl Token {
 
 		// a parser for variables that might have text padding but no zero padding
 		let text_padding_parser = just("{")
-			.ignore_then(VarName::parser())
+			.ignore_then(VarName::parser(relaxed))
 			.then_ignore(just(":"))
 			.then(
 				Padding::text_padding_parser()
@@ -230,7 +254,7 @@ impl Token {
 
 		// a parser for variables that might have zero padding but no text padding
 		let zero_padding_parser = just("{")
-			.ignore_then(VarName::parser())
+			.ignore_then(VarName::parser(relaxed))
 			.then_ignore(just(":"))
 			.then(just("+").map(|_| true).or(empty().map(|_| false)))
 			.then(just("#").map(|_| true).or(empty().map(|_| false)))
@@ -265,6 +289,27 @@ impl Token {
 
 pub type Error = Vec<PError>;
 
+/// Parse a format string. This should mimic the behaviour of Rust. All deviations (both
+/// inputs accepted by Rust but not this function and vice versa) are considered bugs.
 pub fn parse(input: &str) -> Result<Vec<Token>, Error> {
-	Token::parser().repeated().then_ignore(end()).parse(input)
+	Token::parser(false)
+		.repeated()
+		.then_ignore(end())
+		.parse(input)
+}
+
+/// Parse a format string with relaxed idents. Only the initial identifier of a variable
+/// is relaxed,
+///
+/// A relaxed identifier doesn't start with a numeric character and contains any
+/// characters that are
+///  - not control chars
+///  - not a whitespace
+///  - not a colon (`:`)
+///  - no braces (`{` or `}`)
+pub fn parse_relaxed(input: &str) -> Result<Vec<Token>, Error> {
+	Token::parser(true)
+		.repeated()
+		.then_ignore(end())
+		.parse(input)
 }

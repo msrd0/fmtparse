@@ -71,6 +71,18 @@ fn assert(input: &str, expected: &[Token]) {
 	assert_eq!(tokens, expected);
 }
 
+#[track_caller]
+fn assert_relaxed(input: &str, expected: &[Token]) {
+	let tokens = match parse_relaxed(input) {
+		Ok(tokens) => tokens,
+		Err(err) => {
+			report_err(input, "<input>", err);
+			panic!("Failed to parse input");
+		}
+	};
+	assert_eq!(tokens, expected);
+}
+
 macro_rules! text {
 	($text:literal) => {
 		Token::Text(String::from($text))
@@ -247,6 +259,15 @@ macro_rules! var {
 #[test]
 fn mix_vars_and_escaping() {
 	assert("{{{x}}}", &[text!("{"), var!(x), text!("}")]);
+}
+
+#[test]
+fn test_relaxed_vars() {
+	let mut var = var!();
+	let Token::Variable { name, .. } = &mut var else { unreachable!() };
+	*name = VarName::Ident("v'".into());
+
+	assert_relaxed("{v'}", &[var]);
 }
 
 mod std_fmt;
