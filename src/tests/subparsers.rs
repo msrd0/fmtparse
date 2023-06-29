@@ -19,7 +19,7 @@ where
 
 #[test]
 fn padding_can_parse_uint() {
-	assert(Padding::parser(), "5", Padding::TextPadding {
+	assert(Padding::text_padding_parser(), "5", Padding::TextPadding {
 		ch: ' ',
 		align: Align::Left,
 		width: Param::Const(5)

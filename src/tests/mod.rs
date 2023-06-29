@@ -221,7 +221,7 @@ macro_rules! var {
 		Token::Variable {
 			name: VarName::None,
 			padding: Some(Padding::ZeroPadding {
-				width: Param::Const($width)
+				width: $width
 			}),
 			precision: None,
 			style: Style::Display,
@@ -234,7 +234,7 @@ macro_rules! var {
 		Token::Variable {
 			name: VarName::None,
 			padding: Some(Padding::ZeroPadding {
-				width: Param::Const($width)
+				width: $width
 			}),
 			precision: None,
 			style: Style::LowerHex,
